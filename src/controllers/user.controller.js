@@ -13,10 +13,11 @@ const generateAccessAndRefreshToken = async (id) => {
     await user.save({
         validateBeforeSave: false,
     });
-    // console.log(accessToken, refreshToken, 'access tokensssssssssss')
-    
+
     return { accessToken, refreshToken }
 }
+
+console.log('test')
 
 
 const registerUser =  async (req, res) => {
@@ -144,7 +145,7 @@ const loginUser =async (req, res) => {
         }
     })
 
-
+    
 
 
 
