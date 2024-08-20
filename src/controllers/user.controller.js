@@ -198,6 +198,210 @@ const refreshAccessToken = async (req,res) =>{
 }
 
 
+const changeUserPassword = async (req,res) => {
+    const {oldPassword,newPassword} = req.body
+
+    if (!newPassword){
+        return res.status(400).json(
+            {
+                msg: 'new password not provided'
+            }
+        )
+    }
+
+    const user = User.findById(req.user._id)
 
 
-export { registerUser, loginUser, logOutUser, refreshAccessToken }
+    const isPasswordCorrect = user.checkPassword(oldPassword)
+
+    if (!isPasswordCorrect){
+        return res.status(400).json(
+            {
+                msg: 'old password does not matches',
+            }
+        )
+    }
+
+    user.password = newPassword
+    await user.save({
+        validateBeforeSave: false,
+    })
+    // await User.findByIdAndUpdate(user._id,{
+    //     $set:{
+    //         password: newPassword,
+    //     }
+    // },
+    //     {
+    //         new: true
+    //     }
+    //     )
+
+    return res.status(200).json({
+        msg: 'password updated successfully',
+    })
+}
+
+const updateAccountDetails = async (req,res) => {
+    const {email, fullName} = req.body
+
+    if (!email || !fullName){
+        return res.status(400).json({
+            msg: 'fullName or email not provided'
+        })
+    }
+
+    const user = await User.findByIdAndUpdate(req.user?._id, {
+        $set:{
+            email,
+            fullName,
+        }
+    },
+        {
+            new: true
+        }
+    ).select('-password')
+
+    return res.status(200).json({
+        msg: 'updated successfully',
+        data: user,
+    })
+}
+
+const updateUserAvatar = async (req,res) => {
+    const {avatar} = req.file?.path
+
+    if (!avatar){
+        return res.status(400).json({
+            msg: 'avatar not provided'
+        })
+    }
+
+    const uploadAvatar = await cloudinaryUpload(avatar)
+
+    if (!uploadAvatar){
+        return res.status(500).json({
+            msg: 'error occurred on server when uploading the avatar'
+        })
+    }
+
+
+    const user = await User.findByIdAndUpdate(req.user._id,{
+        $set: {
+            avatar: uploadAvatar.url,
+        }
+    }, {
+        new: true,
+        }
+    )
+
+    return res.status(200).json({
+        msg: 'avatar updated successfully',
+        data: user,
+    })
+}
+
+const updateUserCoverImage = async (req,res) => {
+    const {coverImage} = req.file?.path
+
+    if (!coverImage){
+        return res.status(400).json({
+            msg: 'coverImage not provided'
+        })
+    }
+
+    const uploadAvatar = await cloudinaryUpload(coverImage)
+
+    if (!uploadAvatar){
+        return res.status(500).json({
+            msg: 'error occurred on server when uploading the coverImage'
+        })
+    }
+
+
+    const user = await User.findByIdAndUpdate(req.user._id,{
+        $set: {
+            coverImage: uploadAvatar.url,
+        }
+    }, {
+        new: true,
+        }
+    )
+
+    return res.status(200).json({
+        msg: 'coverImage updated successfully',
+        data: user,
+    })
+}
+
+
+const getChannelProfile = async (req,res) =>{
+    const {username} = req.params
+
+    if (!username){
+        return res.status(500).json({
+            msg: 'Username not provided'
+        })
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match:{
+                username: username.toLowerCase()
+            }
+        },
+        {
+            $lookup:{
+                from: 'subscriptions',
+                foreignField: 'channel',
+                localField: '_id',
+                as: 'subscribers'
+            }
+        },
+        {
+            $lookup: {
+                from: 'subscriptions',
+                foreignField: 'subscriber',
+                localField: '_id',
+                as: 'subscribeTo',
+            }
+        },
+        {
+            $addFields:{
+                subscribersCount: {
+                    $size: '$subscribers',
+                },
+                subscribedToCount:{
+                    $size: '$subscribeTo',
+                },
+                isCurrentUserSubscribed: {
+                    $cond:{
+                        if: {
+                            $in: [req.user._id,'$subscribers.subscriber']
+                        },
+                        then: true,
+                        else: false,
+                    }
+                }
+            }
+        },
+        {
+            $project:{
+                fullName: 1,
+                username: 1,
+                subscribersCount: 1,
+                subscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1
+            }        }
+    ])
+
+    return res.status(200).json({
+        data: channel
+    })
+}
+
+
+
+export { registerUser, loginUser, logOutUser, refreshAccessToken,changeUserPassword,updateUserAvatar,updateUserCoverImage,updateAccountDetails, getChannelProfile }
